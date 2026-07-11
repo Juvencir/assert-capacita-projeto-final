@@ -120,6 +120,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     }
     else if (htim->Instance == TIM7)
     {
+        HAL_TIM_Base_Stop_IT(&htim7);
         bsp.tim7DebounceFlag = true;
     }
 }
