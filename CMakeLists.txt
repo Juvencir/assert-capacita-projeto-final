@@ -49,6 +49,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/Button.c
     Core/Src/LedPwm.c
     Core/Src/Sampler.c
+    Core/Src/SerialCmd.c
 )
 
 # Add include paths
