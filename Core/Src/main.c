@@ -27,7 +27,12 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "Bsp.h"
+#include "Button.h"
+#include "LedPwm.h"
+#include "Sampler.h"
+#include "SerialCmd.h"
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -48,7 +53,8 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+static uint32_t telemetryTick = 0U;   ///< Contador de ticks de 5 ms para telemetria
+static uint8_t  lastAdcPercent = 0U;  ///< Ultimo valor percentual valido do ADC
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -60,6 +66,18 @@ static void MPU_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+/**
+ * @brief  Redireciona a saida do printf para a USART3 via BSP.
+ *         Chamada internamente pela funcao _write do newlib.
+ * @param  ch Caractere a ser transmitido.
+ * @retval O proprio caractere transmitido.
+ */
+int __io_putchar(int ch)
+{
+    Bsp_Uart_TransmitChar((uint8_t)ch);
+    return ch;
+}
 
 /* USER CODE END 0 */
 
@@ -103,7 +121,11 @@ int main(void)
   MX_TIM6_Init();
   MX_TIM7_Init();
   /* USER CODE BEGIN 2 */
-
+  Bsp_Init();
+  Sampler_Init();
+  LedPwm_Init();
+  SerialCmd_Init();
+  Button_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -113,6 +135,50 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    /* Processa comandos seriais de forma nao-bloqueante */
+    SerialCmd_Process();
+    if (SerialCmd_IsCommandPending())
+    {
+        LedPwm_SetActiveLed(SerialCmd_GetCommand());
+    }
+
+    Button_Process();
+
+    /* Verifica a flag de amostragem do TIM6 (5 ms) */
+    if (Bsp_Tim6_IsSampleFlag())
+    {
+        Bsp_Tim6_ClearSampleFlag();
+
+        /* So alimenta o amostrador se o sistema nao estiver congelado */
+        if (!Button_IsFrozen())
+        {
+            Sampler_AddSample(Bsp_Adc_Read());
+
+            /* Janela de 100 amostras concluida (500 ms) */
+            if (Sampler_IsWindowComplete())
+            {
+                lastAdcPercent = Sampler_GetAveragePercent();
+
+                /* Atualiza o duty cycle apenas do LED ativo */
+                LedPwm_UpdateActiveDuty(lastAdcPercent);
+            }
+        }
+
+        /* Telemetria a cada 1 segundo (200 ticks de 5 ms) */
+        telemetryTick++;
+        if (telemetryTick >= 200U)
+        {
+            telemetryTick = 0U;
+
+            printf(
+                "VALUE: %u%% || LED1: %u%% aceso || LED2: %u%% aceso || LED3: %u%% aceso || STATE: %s\r\n",
+                lastAdcPercent,
+                LedPwm_GetDuty(eLED_CHANNEL_1),
+                LedPwm_GetDuty(eLED_CHANNEL_2),
+                LedPwm_GetDuty(eLED_CHANNEL_3),
+                Button_IsFrozen() ? "OFF" : "ON");
+        }
+    }
   }
   /* USER CODE END 3 */
 }
