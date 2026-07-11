@@ -92,6 +92,19 @@ bool Bsp_Tim7_IsDebounceFlag(void);
 void Bsp_Tim7_ClearDebounceFlag(void);
 
 /**
+ * @brief  Verifica se a flag de interrupcao do botao foi levantada.
+ * @retval true  Se o botao foi pressionado.
+ * @retval false Se o botao nao foi pressionado.
+ */
+bool Bsp_Button_GetFlag(void);
+
+/**
+ * @brief  Limpa a flag de interrupcao do botao.
+ * @retval Nenhum.
+ */
+void Bsp_Button_ClearFlag(void);
+
+/**
  * @brief  Dispara a conversao ADC por software, aguarda a conclusao com
  *         timeout e retorna o valor bruto de 12 bits.
  * @note   Utiliza polling com timeout seguro definido em dBSP_ADC_TIMEOUT_MS.

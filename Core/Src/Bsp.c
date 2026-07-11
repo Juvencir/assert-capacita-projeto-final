@@ -40,6 +40,7 @@ typedef struct
 {
     volatile bool tim6SampleFlag;    ///< Flag de estouro do TIM6 (5 ms)
     volatile bool tim7DebounceFlag;  ///< Flag de estouro do TIM7 (30 ms)
+    volatile bool buttonPressedFlag; ///< Flag para indicar se o botao foi pressionado
 } Bsp_t;
 
 /// @brief Instancia unica do estado do BSP
@@ -75,8 +76,33 @@ static uint32_t Bsp_Pwm_PercentToCompare(uint8_t percent)
 
 
 /*---------------------------------------------------------------------------*/
-/* Callbacks da HAL                                                          */
+/* ISR e Callbacks da HAL                                                    */
 /*---------------------------------------------------------------------------*/
+
+/**
+ * @brief  ISR compartilhada das linhas EXTI 10 a 15.
+ *         Encaminha o tratamento para a HAL, que chamara o callback.
+ * @note   O pino USER_Btn esta em PC13 (EXTI13).
+ */
+void EXTI15_10_IRQHandler(void)
+{
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_13);
+}
+
+/**
+ * @brief  Callback da HAL disparado quando uma interrupcao EXTI ocorre.
+ *         Filtra pelo pino do botao (PC13) e sinaliza a flag interna.
+ * @param  GPIO_Pin Pino que gerou a interrupcao.
+ * @note   Executada em contexto de ISR. Apenas sinaliza.
+ * @retval Nenhum.
+ */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    if (GPIO_Pin == GPIO_PIN_13)
+    {
+        bsp.buttonPressedFlag = true;
+    }
+}
 
 /**
  * @brief  Callback de periodo expirado dos timers.
@@ -104,6 +130,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 void Bsp_Init(void)
 {
+    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0U, 0U);
+    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+
     HAL_TIM_Base_Start_IT(&htim6);
 
     Bsp_Pwm_StartAll();
@@ -132,6 +161,16 @@ bool Bsp_Tim7_IsDebounceFlag(void)
 void Bsp_Tim7_ClearDebounceFlag(void)
 {
     bsp.tim7DebounceFlag = false;
+}
+
+bool Bsp_Button_GetFlag(void)
+{
+    return bsp.buttonPressedFlag;
+}
+
+void Bsp_Button_ClearFlag(void)
+{
+    bsp.buttonPressedFlag = false;
 }
 
 uint16_t Bsp_Adc_Read(void)
